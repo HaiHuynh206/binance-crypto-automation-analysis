@@ -1,8 +1,8 @@
-# Crypto High-Frequency Data Platform
+# Binance Crypto Data Platform
 
-Pipeline thu thập dữ liệu thị trường crypto tần suất cao (Binance public API), chạy
-Airflow mỗi **2 giờ**, lưu vào **Parquet lake** partition theo giờ và truy vấn bằng
-**DuckDB**.
+Pipeline thu thập dữ liệu thị trường crypto tần suất cao từ **Binance public API**,
+chạy **Airflow mỗi 2 giờ**, lưu thành **Parquet lake** partition theo giờ, query bằng
+**DuckDB** và publish lên **Cloudflare R2 / S3 / MinIO** để chia sẻ.
 
 ```
 Binance REST API
@@ -16,22 +16,34 @@ data/lake/exchange=binance/dataset=.../symbol=.../date=.../hour=.../part-00000.p
       ├── data/_state/completed/...   (marker idempotency)
       └── data/catalog.duckdb         (DuckDB views)
                 │
-                ├──► SQL / dashboard / notebook
-                └──► S3 / R2 / MinIO (share cho người khác)
+                ├──► SQL / notebook / dashboard
+                └──► S3 / R2 / MinIO (chia sẻ cho người khác)
 ```
+
+## Triển khai hiện tại
+
+Repo này được thiết kế để chạy cả local và trên VPS:
+
+- **Airflow + Docker Compose** chạy 24/7 trên VPS 2 vCPU / 4 GB RAM
+  (ví dụ GCP `e2-medium`, Singapore, Ubuntu 24.04 LTS).
+- **DAG** `crypto_market_ingest`, schedule `0 */2 * * *` UTC.
+- **UI** có thể truy cập qua LAN, Cloudflare Tunnel hoặc Tailscale Funnel.
+- **Dữ liệu** được publish incrementally lên R2 kèm `_manifest.json`.
+- Tài khoản `Viewer` chỉ được xem DAG/log, không trigger hay sửa.
 
 ## Vì sao thiết kế như vậy
 
 - **Mỗi giờ = một file Parquet** → ghi atomic, retry/backfill chỉ ghi đè đúng giờ đó,
-  không bao giờ có dữ liệu trùng hoặc file dở dang.
+  không sinh dữ liệu trùng hoặc file dở dang.
 - **Marker hoàn thành theo từng partition** → chạy lại cùng window gần như miễn phí;
   task fail thì lần retry chỉ tải lại phần thiếu.
 - **Rate limit + retry** nằm trong code, không phụ thuộc Airflow.
 - **DuckDB** đọc trực tiếp Parquet, không cần server, không copy dữ liệu.
+- **Upload incremental** dựa trên ETag/MD5, chỉ đẩy file mới hoặc thay đổi.
 
 ## Dataset
 
-| Dataset | Nguồn | Tần suất dữ liệu | Ghi chú |
+| Dataset | Nguồn | Tần suất | Ghi chú |
 |---|---|---|---|
 | `klines_1s` | `GET /api/v3/klines` | 1 giây | ~3.600 dòng/giờ/symbol |
 | `klines_1m` | `GET /api/v3/klines` | 1 phút | ~60 dòng/giờ/symbol |
@@ -44,7 +56,9 @@ data/lake/exchange=binance/dataset=.../symbol=.../date=.../hour=.../part-00000.p
 Yêu cầu: Python >= 3.10.
 
 ```bash
-cd "bigdata project"
+git clone https://github.com/HaiHuynh206/binance-crypto-automation-analysis.git
+cd binance-crypto-automation-analysis
+
 make install
 
 # Lấy 2 giờ gần nhất cho toàn bộ dataset mặc định
@@ -78,38 +92,39 @@ print(con.sql('''
 > Lần chạy đầu với `agg_trades` cho BTCUSDT có thể mất vài phút vì phải phân trang
 > qua hàng trăm nghìn trade. Bắt đầu với `-d klines_1m` để test nhanh.
 
-## Chạy Airflow (Docker)
+## Chạy Airflow bằng Docker
 
-Cài Docker (Ubuntu, cần quyền sudo):
+Cài Docker (Ubuntu/Debian, cần quyền sudo):
 
 ```bash
 sudo bash scripts/install-docker.sh
 # đăng xuất/đăng nhập lại để dùng docker không cần sudo
 ```
 
-Sau đó:
+Tạo file cấu hình và khởi động:
 
 ```bash
-cd "/home/hai-huynh/bigdata project"
-make up          # tạo .env + build image + postgres + webserver + scheduler
+cp .env.example .env
+# sửa tối thiểu: AIRFLOW_ADMIN_PASSWORD, CRYPTO_S3_* nếu dùng R2/S3
+make up
 ```
 
-- UI: http://localhost:8080 (mặc định `admin` / `admin`, đổi trong `.env`).
-- DAG: `crypto_market_ingest`, schedule `0 */2 * * *`.
-- Mở UI và bật DAG (lúc tạo đang **paused**); scheduler sẽ chạy interval gần nhất.
-- Logs: `make logs`; dừng: `make down`; reset toàn bộ: `make down && docker compose down -v`.
+- UI: `http://localhost:8080`
+- DAG: `crypto_market_ingest`, schedule `0 */2 * * *` UTC.
+- Mở UI và bật DAG (lúc tạo đang **paused**).
+- Logs: `make logs`; dừng: `make down`; reset toàn bộ:
+  `make down && docker compose down -v`.
 
-Lưu ý quan trọng:
+Lưu ý:
 
-- **Giữ `AIRFLOW_UID=50000`** trong `.env`. Nếu đổi thành uid của bạn (1000),
-  Airflow báo lỗi `The user that Airflow is running as has no username`.
-- Nếu vừa cài Docker mà gặp `permission denied` khi gọi `docker`, hãy logout/login
-  (hoặc chạy `newgrp docker`) để nhận group mới.
+- **Giữ `AIRFLOW_UID=50000`** trong `.env`. Nếu đổi thành UID của bạn (1000),
+  Airflow có thể báo lỗi `The user that Airflow is running as has no username`.
+- Nếu vừa cài Docker mà gặp `permission denied`, logout/login hoặc chạy
+  `newgrp docker`.
 - Chạy CLI trên host **và** Airflow trong container cùng lúc thì cần quyền ghi chung
-  cho thư mục `data/`:
-  `make permissions`.
-- Đổi `CRYPTO_SYMBOLS`/`CRYPTO_DATASETS` trong `.env` rồi `docker compose up -d`
-  để áp dụng cho container.
+  cho `data/`: `make permissions`.
+- Đổi `CRYPTO_SYMBOLS`/`CRYPTO_DATASETS` trong `.env` rồi
+  `docker compose up -d` để áp dụng.
 
 Luồng task:
 
@@ -120,7 +135,28 @@ ingest_* (5 task) ──┬─► refresh_catalog
 
 `max_active_tasks=2` để tránh 5 task cùng đập vào rate limit của Binance.
 
-## Chia sẻ data
+## Chạy 24/7 trên VPS
+
+Yêu cầu tối thiểu: **2 vCPU, 4 GB RAM, 40 GB SSD**, Ubuntu 24.04 LTS.
+Nên thêm 2 GB swap. VPS 2 GB RAM dễ OOM khi Airflow + Postgres + ingest chạy cùng.
+
+Migrate code và dữ liệu từ máy local:
+
+```bash
+make migrate HOST=user@<IP> WITH_DATA=1
+```
+
+Sau khi migrate:
+
+1. Đặt `AIRFLOW_WEB_BIND=127.0.0.1` trong `.env` nếu chỉ truy cập qua tunnel.
+2. Kiểm tra `docker compose ps` và `curl localhost:8080/health`.
+3. Dừng stack local (`make down`, `make unshare`) để tránh hai DAG cùng chạy.
+4. Cập nhật link UI cho người nhận.
+
+Chi tiết chọn VPS, firewall, backup và migrate dữ liệu:
+[`docs/deploy-vps.md`](docs/deploy-vps.md).
+
+## Chia sẻ dữ liệu
 
 Đẩy lake lên **Cloudflare R2 / AWS S3 / MinIO**, giữ nguyên layout Hive để người
 nhận query bằng DuckDB, Athena hoặc Spark:
@@ -130,30 +166,64 @@ make sync-s3 DRY_RUN=1   # xem trước
 make sync-s3             # upload phần thay đổi + _manifest.json
 ```
 
-DAG tự chạy task `publish_to_s3` sau mỗi lần ingest khi `CRYPTO_S3_BUCKET` được
-set. Hướng dẫn tạo bucket R2, cấp quyền đọc, query mẫu và chi phí:
-[`docs/share-s3.md`](docs/share-s3.md).
+DAG tự chạy task `publish_to_s3` sau mỗi lần ingest khi `CRYPTO_S3_BUCKET` được set.
+
+- Người nhận chỉ cần **read-only token**, không cấp write token.
+- Manifest nằm tại `s3://<bucket>/<prefix>/_manifest.json`.
+- Hướng dẫn tạo bucket R2, cấp quyền đọc, query mẫu và chi phí:
+  [`docs/share-s3.md`](docs/share-s3.md).
+- Hướng dẫn gửi cho người nhận: [`docs/consumer.md`](docs/consumer.md).
 
 ## Chia sẻ UI
 
-- Cùng LAN: `http://<ip-may-nay>:8080` (ví dụ `http://192.168.1.17:8080`).
-- Internet nhanh: `make share` → Cloudflare quick tunnel in ra URL HTTPS.
-  Dừng bằng `make unshare`.
-- Tài khoản: `admin` (không share) và `viewer` (role Viewer, chỉ xem).
-- Chi tiết named tunnel + domain, Cloudflare Access, Tailscale và cách tạo tài
-  khoản riêng: [`docs/sharing.md`](docs/sharing.md).
+### Cùng LAN
 
-## Chạy 24/7 khi tắt PC
+Mở `http://<ip-may-chay-airflow>:8080`. Chỉ nên dùng trong mạng tin cậy.
 
-Airflow đang chạy trên chính PC này, nên tắt máy là dừng. Để chạy 24/7, migrate
-sang VPS:
+### Cloudflare Quick Tunnel — nhanh, URL tạm
 
 ```bash
-make migrate HOST=root@<IP> WITH_DATA=1
+make share      # in ra https://<random>.trycloudflare.com
+make unshare    # dừng tunnel
 ```
 
-Hướng dẫn chọn VPS (4 GB RAM), migrate dữ liệu, bảo mật và backup:
-[`docs/deploy-vps.md`](docs/deploy-vps.md).
+URL **đổi sau mỗi lần restart**, phù hợp demo ngắn.
+
+### Tailscale Funnel — URL cố định, không cần domain
+
+Cài Tailscale trên máy chạy Airflow:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up --hostname=airflow-crypto --accept-dns=false
+sudo tailscale funnel --bg 8080
+```
+
+Lần đầu cần bật Funnel cho tailnet theo hướng dẫn của Tailscale. URL có dạng:
+
+```text
+https://airflow-crypto.<tailnet>.ts.net
+```
+
+URL giữ nguyên khi reboot, miễn là Tailscale và Funnel còn bật.
+
+### Named Tunnel + domain — ổn định lâu dài
+
+Nếu có domain trên Cloudflare, dùng Named Tunnel để có URL như
+`https://airflow.example.com`. Chi tiết:
+[`docs/sharing.md`](docs/sharing.md).
+
+### Tài khoản
+
+Tạo tài khoản Viewer riêng cho từng người:
+
+```bash
+docker compose exec airflow-scheduler airflow users create \
+  --username alice --firstname Alice --lastname Nguyen \
+  --role Viewer --email alice@example.com --password 'MatKhauManh'
+```
+
+Không share tài khoản `admin`. Role `Viewer` chỉ xem DAG, grid và log.
 
 ## Cấu hình
 
@@ -161,11 +231,14 @@ Tất cả qua biến môi trường (xem `.env.example`):
 
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
+| `AIRFLOW_UID` | `50000` | UID container Airflow; **không đổi tùy tiện** |
+| `AIRFLOW_WEB_BIND` | `0.0.0.0` | Đặt `127.0.0.1` nếu chỉ truy cập qua tunnel |
+| `AIRFLOW_ADMIN_PASSWORD` | `admin` | Đổi trước khi chạy lần đầu |
 | `CRYPTO_DATA_ROOT` | `./data` | Thư mục gốc chứa lake + state |
 | `CRYPTO_SYMBOLS` | `BTCUSDT,ETHUSDT` | Danh sách symbol |
 | `CRYPTO_DATASETS` | cả 5 dataset | Dataset cần chạy |
 | `CRYPTO_WEIGHT_PER_MINUTE` | `2400` | Ngân sách weight/phút (Binance cho 6000/IP) |
-| `CRYPTO_LOOKBACK_HOURS` | `24` | Quét lại 24h gần nhất, tự bù hour còn thiếu sau downtime |
+| `CRYPTO_LOOKBACK_HOURS` | `24` | Quét lại 24h gần nhất, tự bù hour thiếu sau downtime |
 | `CRYPTO_MAX_PAGES` | `5000` | Chặn an toàn khi phân trang |
 | `CRYPTO_HTTP_TIMEOUT` | `20` | Timeout mỗi request (giây) |
 | `CRYPTO_S3_BUCKET` | (trống) | Bucket đích; trống = tắt publish S3 |
@@ -173,9 +246,11 @@ Tất cả qua biến môi trường (xem `.env.example`):
 | `CRYPTO_S3_ENDPOINT_URL` | (trống) | R2/MinIO endpoint; trống = AWS S3 |
 | `CRYPTO_S3_REGION` | `auto` | `auto` cho R2, region cho AWS/MinIO |
 | `CRYPTO_S3_ACL` | (trống) | Ví dụ `public-read` (chỉ AWS S3) |
+| `AWS_ACCESS_KEY_ID` | (trống) | Access key cho S3/R2/MinIO |
+| `AWS_SECRET_ACCESS_KEY` | (trống) | Secret key cho S3/R2/MinIO |
 
-Thêm symbol: sửa `CRYPTO_SYMBOLS` rồi restart scheduler (hoặc chạy CLI backfill cho
-symbol mới). Không cần migration.
+Thêm symbol: sửa `CRYPTO_SYMBOLS` rồi restart scheduler, hoặc chạy CLI backfill cho
+symbol mới. Không cần migration.
 
 ## Cấu trúc code
 
@@ -192,31 +267,20 @@ src/crypto_ingest/
   s3.py                       upload lake lên S3/R2/MinIO + manifest
   pipeline.py                 orchestration một window
   catalog.py                  tạo DuckDB views
-  cli.py                      ingest / backfill / status / catalog
+  cli.py                      ingest / backfill / status / catalog / sync-s3
+scripts/
+  install-docker.sh           cài Docker trên Ubuntu/Debian
+  migrate-to-vps.sh           rsync code + data lên VPS
+  share-ui.sh                 Cloudflare quick tunnel
+  stop-share.sh               dừng quick tunnel
 tests/                        unit test (không gọi mạng)
-docs/storage.md               khuyến nghị nơi lưu dữ liệu chi tiết
-docs/share-s3.md              chia sẻ data qua S3/R2/MinIO
-docs/consumer.md              hướng dẫn gửi cho người nhận data
+docs/
+  storage.md                  khuyến nghị nơi lưu dữ liệu
+  share-s3.md                 chia sẻ data qua S3/R2/MinIO
+  consumer.md                 hướng dẫn cho người nhận data
+  sharing.md                  chia sẻ Airflow UI
+  deploy-vps.md               deploy 24/7 lên VPS
 ```
-
-## Lưu dữ liệu ở đâu?
-
-**Khuyến nghị cho giai đoạn hiện tại: Parquet + Zstandard trên SSD local, partition
-theo giờ, query bằng DuckDB** (đúng như code này đang làm).
-
-Lý do: dữ liệu append-only, ít update, chủ yếu scan theo symbol + thời gian; Parquet
-nén tốt (thường 5–15x so với JSON), DuckDB query vài trăm triệu dòng trên laptop mà
-không cần vận hành server. Đây là lựa chọn rẻ nhất và ít rủi ro nhất để bắt đầu.
-
-Khi scale lên, lộ trình:
-
-1. **> 500 GB / nhiều máy / cần backup tự động** → MinIO hoặc S3 làm lake
-   (giữ nguyên layout partition), DuckDB `httpfs` hoặc Athena query.
-2. **Dashboard, nhiều người query, cần sub-second trên hàng tỷ dòng** → ClickHouse
-   (`MergeTree`, `ORDER BY (symbol, trade_time)`, TTL + codec).
-3. **Cần realtime < 1 phút** → Kafka/Redpanda → ClickHouse (ngoài phạm vi batch 2h).
-
-Chi tiết so sánh, sizing và những thứ **không nên** dùng: [`docs/storage.md`](docs/storage.md).
 
 ## Vận hành & giới hạn cần biết
 
@@ -226,16 +290,21 @@ Chi tiết so sánh, sizing và những thứ **không nên** dùng: [`docs/stor
   khi file đã ghi xong.
 - **`open_interest`** chỉ truy vấn được 30 ngày gần nhất → backfill sâu hơn sẽ lỗi.
 - **`agg_trades`** rất nặng; tăng `CRYPTO_SYMBOLS` sẽ tăng thời gian chạy tuyến tính.
-- **Không dùng Airflow metadata DB** để lưu market data.
-- **File nhỏ**: mỗi symbol/dataset sinh 24 file/ngày. Với ~100k file, DuckDB vẫn ổn;
-  nếu vượt nhiều, gộp theo ngày/tháng bằng job compaction (xem docs).
+- **Không chạy DAG local và VPS cùng lúc** để tránh ingest/publish trùng.
+- **Quick Tunnel** đổi URL sau restart; dùng Tailscale Funnel hoặc Named Tunnel nếu
+  cần URL cố định.
+- **Dung lượng R2**: với 2 symbol, 5 dataset, tăng khoảng 28 MB/ngày (~0.8 GB/tháng).
+  Xem phân tích và cách giảm dung lượng trong `docs/share-s3.md`.
+- **Backup**: tối thiểu `data/lake` + `data/_state`; Airflow metadata nằm trong volume
+  Postgres (`pg_dump` nếu cần giữ lịch sử chạy).
 - Dữ liệu Binance thuộc Binance; kiểm tra điều khoản nếu dùng cho mục đích thương mại.
 
 ## Test
 
 ```bash
 make test
+make lint
 ```
 
-Test không gọi mạng: fetcher được stub, chỉ kiểm tra chia giờ, dedupe, ghi/đọc
-partition, idempotency và xử lý lỗi.
+Test không gọi mạng: fetcher được stub, kiểm tra chia giờ, dedupe, ghi/đọc partition,
+idempotency và xử lý lỗi.
