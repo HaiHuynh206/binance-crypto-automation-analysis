@@ -1,0 +1,2 @@
+n_snapshots,spread_mean,spread_median,rel_spread_bps_mean,bid_size1_mean,ask_size1_mean,source_message,source_orderbook
+118497,0.15501641391765314,0.14999999999997726,2.6551719527453397,227.19609779150528,147.1927559347494,AAPL_2012-06-21_34200000_57600000_message_1.csv,AAPL_2012-06-21_34200000_57600000_orderbook_1.csv

@@ -4,6 +4,8 @@ Pipeline thu thập dữ liệu thị trường crypto tần suất cao từ **B
 chạy **Airflow mỗi 2 giờ**, lưu thành **Parquet lake** partition theo giờ, query bằng
 **DuckDB** và publish lên **Cloudflare R2 / S3 / MinIO** để chia sẻ.
 
+> **MFF4030 group 4:** phân tích chất lượng thị trường trên lake → thư mục [`B4_as_requested/`](B4_as_requested/).
+
 ```
 Binance REST API
       │  (klines 1s/1m, aggTrades, funding rate, open interest)
