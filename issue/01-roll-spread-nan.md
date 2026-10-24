@@ -1,4 +1,4 @@
-﻿---
+---
 id: 01
 title: Roll spread = NaN 100% — biểu đồ Roll trống
 severity: P1

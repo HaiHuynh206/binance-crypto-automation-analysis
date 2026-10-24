@@ -16,6 +16,27 @@ rồi các mục cố định **Hiện tượng → Ảnh hưởng → Bằng ch
 Đường dẫn trong front-matter tính từ repo root; link trong thân bài tính tương đối với file.
 Mẫu để tạo issue mới: [`_template.md`](_template.md).
 
+## Bản mirror trên GitHub Issues
+
+Mỗi file ở đây được tạo thành một GitHub Issue (label `p1`/`p2`/`p3`) để theo dõi trạng thái
+trên tab **Issues**. **File `.md` vẫn là nguồn chính** — sửa nội dung ở đây trước, rồi đồng bộ.
+
+| File | GitHub |
+|---|---|
+| `01-roll-spread-nan.md` … `16-readme-repro-order.md` | [#2](https://github.com/HaiHuynh206/binance-crypto-automation-analysis/issues/2) … [#17](https://github.com/HaiHuynh206/binance-crypto-automation-analysis/issues/17) |
+
+Số issue GitHub = số file + 1 (vì #1 là PR kiến trúc) — con số này không đổi về sau vì
+GitHub chỉ tăng số.
+
+Đồng bộ lại (idempotent, bỏ qua issue đã có theo tiền tố `[NN]`):
+
+```bash
+python issue/sync/sync_issues.py
+```
+
+Script sẽ tạo label `p1`/`p2`/`p3` nếu thiếu, đổi link tương đối trong body thành link
+tuyệt đối tới repo, và thêm dòng "Nguồn: issue/NN-*.md" ở đầu mỗi issue.
+
 ## Định nghĩa severity
 
 | Mức | Nghĩa | Xử lý |
