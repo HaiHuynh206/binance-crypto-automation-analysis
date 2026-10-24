@@ -4,7 +4,12 @@ Pipeline thu thập dữ liệu thị trường crypto tần suất cao từ **B
 chạy **Airflow mỗi 2 giờ**, lưu thành **Parquet lake** partition theo giờ, query bằng
 **DuckDB** và publish lên **Cloudflare R2 / S3 / MinIO** để chia sẻ.
 
+![Kiến trúc: Binance API → ingestion → lakehouse Parquet (bronze/silver/gold) → Airflow/Docker → R2/S3/MinIO](docs/assets/architecture.png)
+
 > **MFF4030 group 4:** phân tích chất lượng thị trường trên lake → thư mục [`B4_as_requested/`](B4_as_requested/).
+
+<details>
+<summary>Sơ đồ dạng text (cho terminal / diff)</summary>
 
 ```
 Binance REST API
@@ -21,6 +26,8 @@ data/lake/exchange=binance/dataset=.../symbol=.../date=.../hour=.../part-00000.p
                 ├──► SQL / notebook / dashboard
                 └──► S3 / R2 / MinIO (chia sẻ cho người khác)
 ```
+
+</details>
 
 ## Triển khai hiện tại
 
@@ -277,6 +284,7 @@ scripts/
   stop-share.sh               dừng quick tunnel
 tests/                        unit test (không gọi mạng)
 docs/
+  assets/architecture.png      sơ đồ kiến trúc (dùng ở đầu README)
   storage.md                  khuyến nghị nơi lưu dữ liệu
   share-s3.md                 chia sẻ data qua S3/R2/MinIO
   consumer.md                 hướng dẫn cho người nhận data
