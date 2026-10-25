@@ -5,8 +5,8 @@ severity: P3
 status: open
 area: packaging
 files:
-  - B4_as_requested/requirements.txt
-  - B4_as_requested/src/r2_lake.py
+  - B4_analysis/requirements.txt
+  - B4_analysis/src/r2_lake.py
 ---
 
 # 12 — Vệ sinh dependency

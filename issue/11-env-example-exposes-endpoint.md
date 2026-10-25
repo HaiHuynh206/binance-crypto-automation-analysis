@@ -5,7 +5,7 @@ severity: P3
 status: open
 area: security
 files:
-  - B4_as_requested/.env.example
+  - B4_analysis/.env.example
 ---
 
 # 11 — Endpoint và bucket R2 bị commit

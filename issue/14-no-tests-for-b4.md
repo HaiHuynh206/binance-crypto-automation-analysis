@@ -5,7 +5,7 @@ severity: P3
 status: open
 area: testing
 files:
-  - B4_as_requested/src/
+  - B4_analysis/src/
   - tests/
 ---
 
@@ -15,7 +15,7 @@ files:
 
 `tests/` chỉ có test cho package ingest (`test_pipeline.py`, `test_schemas.py`,
 `test_storage.py`, `test_s3.py`, `test_timeutil.py`). Không có test nào chạm vào
-`B4_as_requested/src/*.py` — kể cả các hàm thuần toán học rất dễ test.
+`B4_analysis/src/*.py` — kể cả các hàm thuần toán học rất dễ test.
 
 ## Ảnh hưởng
 
@@ -29,9 +29,9 @@ files:
 ```python
 # tests/test_b4_metrics.py
 import numpy as np, pandas as pd
-from B4_as_requested.src.metrics_roll_amihud import roll_effective_spread
-from B4_as_requested.src.metrics_variance_ratio import variance_ratio
-from B4_as_requested.src.metrics_ofi_impact import signed_volume
+from B4_analysis.src.metrics_roll_amihud import roll_effective_spread
+from B4_analysis.src.metrics_variance_ratio import variance_ratio
+from B4_analysis.src.metrics_ofi_impact import signed_volume
 
 def test_roll_recovers_known_spread():
     # bounce ±s/2 quanh 100 -> Roll ~ s
@@ -51,7 +51,7 @@ def test_ofi_sign():
     assert list(signed_volume(df)) == [1.0, -2.0]
 ```
 
-(`B4_as_requested` chưa phải package import được từ root — hoặc thêm `B4_as_requested/__init__.py`,
+(`B4_analysis` chưa phải package import được từ root — hoặc thêm `B4_analysis/__init__.py`,
 hoặc dùng `sys.path.insert` như các module trong `src/` đang làm.)
 
 ## Nghiệm thu

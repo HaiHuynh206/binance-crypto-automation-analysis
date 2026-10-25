@@ -5,9 +5,9 @@ severity: P2
 status: open
 area: config / reproducibility
 files:
-  - B4_as_requested/src/compute_from_r2.py
-  - B4_as_requested/notebooks/B4_phan_tich_chat_luong_tt.ipynb
-  - B4_as_requested/docs/figures/export_figures_r2.py
+  - B4_analysis/src/compute_from_r2.py
+  - B4_analysis/notebooks/B4_phan_tich_chat_luong_tt.ipynb
+  - B4_analysis/docs/figures/export_figures_r2.py
 ---
 
 # 08 — Ngày mặc định rải rác 3 chỗ

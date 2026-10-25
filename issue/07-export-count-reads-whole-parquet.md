@@ -5,7 +5,7 @@ severity: P2
 status: open
 area: pipeline
 files:
-  - B4_as_requested/src/compute_from_r2.py
+  - B4_analysis/src/compute_from_r2.py
 ---
 
 # 07 — Memory spike khi export

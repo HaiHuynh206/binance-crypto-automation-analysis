@@ -5,9 +5,9 @@ severity: P1
 status: open
 area: metrics
 files:
-  - B4_as_requested/src/metrics_roll_amihud.py
-  - B4_as_requested/notebooks/B4_phan_tich_chat_luong_tt.ipynb
-  - B4_as_requested/docs/B4_bao_cao.md
+  - B4_analysis/src/metrics_roll_amihud.py
+  - B4_analysis/notebooks/B4_phan_tich_chat_luong_tt.ipynb
+  - B4_analysis/docs/B4_bao_cao.md
 evidence:
   - issue/evidence/roll-spread-nan.md
   - issue/evidence/notebook-cell3-roll-empty.png

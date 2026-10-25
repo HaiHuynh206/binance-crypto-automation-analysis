@@ -5,8 +5,8 @@ severity: P3
 status: open
 area: docs
 files:
-  - B4_as_requested/README.md
-  - B4_as_requested/.gitignore
+  - B4_analysis/README.md
+  - B4_analysis/.gitignore
 ---
 
 # 16 — Clone mới không chạy được notebook ngay
@@ -16,7 +16,7 @@ files:
 `README.md` liệt kê lệnh nhưng không nói rõ **thứ tự phụ thuộc**:
 
 ```bash
-cd B4_as_requested
+cd B4_analysis
 cp .env.example .env
 pip install -r requirements.txt
 python -m src.r2_lake --dataset klines_1m --limit 10
@@ -45,7 +45,7 @@ Viết lại phần "Chạy" thành luồng có đánh số + nói rõ cái gì 
 ## Chạy lại từ đầu (cần key R2 read-only)
 
 ```bash
-cd B4_as_requested
+cd B4_analysis
 pip install -r requirements.txt
 cp .env.example .env          # điền AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
 

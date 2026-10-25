@@ -1,6 +1,6 @@
-# Issue log — B4_as_requested
+# Issue log — B4_analysis
 
-Danh sách lỗi/bug/vấn đề tìm thấy khi review `B4_as_requested/` (commit `5a37e3a`).
+Danh sách lỗi/bug/vấn đề tìm thấy khi review `B4_analysis/` (commit `5a37e3a`).
 Mỗi issue là một file riêng; trong file có link xuống bằng chứng và script tái hiện.
 
 ## Cách đọc (progressive disclosure)
@@ -90,5 +90,5 @@ python repro/roll_spread_nan.py
 python repro/duckdb_hive_check.py      # cần: pip install duckdb numpy
 
 # chạy lại đúng luồng thật (cần .env có key R2)
-cd B4_as_requested && python -m src.compute_from_r2 --symbols BTCUSDT,ETHUSDT
+cd B4_analysis && python -m src.compute_from_r2 --symbols BTCUSDT,ETHUSDT
 ```

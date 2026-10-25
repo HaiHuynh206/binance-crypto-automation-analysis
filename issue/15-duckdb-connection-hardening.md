@@ -5,7 +5,7 @@ severity: P3
 status: open
 area: infra
 files:
-  - B4_as_requested/src/r2_lake.py
+  - B4_analysis/src/r2_lake.py
 ---
 
 # 15 — Kết nối DuckDB chưa được gia cố

@@ -5,11 +5,11 @@ severity: P3
 status: open
 area: naming
 files:
-  - B4_as_requested/src/paths.py
-  - B4_as_requested/src/__init__.py
-  - B4_as_requested/src/r2_lake.py
-  - B4_as_requested/docs/B4_bao_cao.md
-  - B4_as_requested/notebooks/B4_phan_tich_chat_luong_tt.ipynb
+  - B4_analysis/src/paths.py
+  - B4_analysis/src/__init__.py
+  - B4_analysis/src/r2_lake.py
+  - B4_analysis/docs/B4_bao_cao.md
+  - B4_analysis/notebooks/B4_phan_tich_chat_luong_tt.ipynb
 ---
 
 # 09 — Sót tên `group_4` sau khi đổi cấu trúc repo
@@ -27,7 +27,7 @@ files:
 ## Ảnh hưởng
 
 Người đọc code tưởng phải tạo thư mục `group_4/.env` thì mới chạy được, trong khi thực tế
-là `B4_as_requested/.env`. Gây lỗi "chạy không được" không đáng có khi chấm bài.
+là `B4_analysis/.env`. Gây lỗi "chạy không được" không đáng có khi chấm bài.
 (Nhãn "Nhóm: group_4" trong báo cáo/notebook thì **giữ nguyên**.)
 
 ## Cách sửa
@@ -36,14 +36,14 @@ Chỉ sửa 4 chỗ trong `src/`:
 
 ```diff
 - """Project paths rooted at group_4/."""
-+ """Project paths rooted at B4_as_requested/."""
++ """Project paths rooted at B4_analysis/."""
 - # group_4 metrics & ingest package
-+ # B4_as_requested metrics & ingest package
++ # B4_analysis metrics & ingest package
 - Requires in group_4/.env:
-+ Requires in B4_as_requested/.env:
++ Requires in B4_analysis/.env:
 ```
 
 ## Nghiệm thu
 
-- [ ] `grep -rn "group_4" B4_as_requested/src` không còn kết quả.
+- [ ] `grep -rn "group_4" B4_analysis/src` không còn kết quả.
 - [ ] Các nhãn "Nhóm: group_4" trong báo cáo/notebook vẫn còn (đúng chủ ý).

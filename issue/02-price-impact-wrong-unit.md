@@ -5,7 +5,7 @@ severity: P1
 status: open
 area: metrics
 files:
-  - B4_as_requested/src/metrics_ofi_impact.py
+  - B4_analysis/src/metrics_ofi_impact.py
 evidence:
   - issue/evidence/verified-ok.md
 repro: null

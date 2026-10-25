@@ -1,4 +1,4 @@
-# B4_as_requested — MFF4030 market quality
+# B4_analysis — MFF4030 market quality
 
 ```
 crypto_market_ingest (repo này) → R2 lake → compute_from_r2 → notebook / báo cáo
@@ -8,7 +8,7 @@ crypto_market_ingest (repo này) → R2 lake → compute_from_r2 → notebook / 
 ## Chạy
 
 ```bash
-cd B4_as_requested
+cd B4_analysis
 cp .env.example .env   # điền AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
 pip install -r requirements.txt
 python -m src.r2_lake --dataset klines_1m --limit 10

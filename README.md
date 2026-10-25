@@ -6,7 +6,7 @@ chạy **Airflow mỗi 2 giờ**, lưu thành **Parquet lake** partition theo gi
 
 ![Kiến trúc: Binance API → ingestion → lakehouse Parquet (bronze/silver/gold) → Airflow/Docker → R2/S3/MinIO](docs/assets/architecture.png)
 
-> **MFF4030 group 4:** phân tích chất lượng thị trường trên lake → thư mục [`B4_as_requested/`](B4_as_requested/).
+> **MFF4030 group 4:** phân tích chất lượng thị trường trên lake → thư mục [`B4_analysis/`](B4_analysis/).
 
 <details>
 <summary>Sơ đồ dạng text (cho terminal / diff)</summary>

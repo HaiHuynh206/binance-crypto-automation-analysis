@@ -5,9 +5,9 @@ severity: P3
 status: open
 area: code quality
 files:
-  - B4_as_requested/src/metrics_roll_amihud.py
-  - B4_as_requested/src/compute_from_r2.py
-  - B4_as_requested/src/metrics_ofi_impact.py
+  - B4_analysis/src/metrics_roll_amihud.py
+  - B4_analysis/src/compute_from_r2.py
+  - B4_analysis/src/metrics_ofi_impact.py
 ---
 
 # 13 — Docstring không khớp code, code chết

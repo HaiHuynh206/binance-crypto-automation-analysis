@@ -5,7 +5,7 @@ severity: P3
 status: open
 area: hygiene
 files:
-  - B4_as_requested/notebooks/B4_phan_tich_chat_luong_tt.ipynb
+  - B4_analysis/notebooks/B4_phan_tich_chat_luong_tt.ipynb
 ---
 
 # 10 — Notebook lưu đường dẫn tuyệt đối của máy tác giả
@@ -31,7 +31,7 @@ Loaded 6 tables from D:\Thsi_2025\bigdata\group_4\data\metrics\source=r2 2026-10
 
 ```python
 print("Loaded", len(tables), "tables from", METRICS.relative_to(ROOT.parent), RANGE)
-# -> Loaded 6 tables from B4_as_requested/data/metrics/source=r2 2026-10-19_2026-10-21
+# -> Loaded 6 tables from B4_analysis/data/metrics/source=r2 2026-10-19_2026-10-21
 ```
 
 2. Clear output của cell 1 và chạy lại (Restart & Run All), rồi lưu.

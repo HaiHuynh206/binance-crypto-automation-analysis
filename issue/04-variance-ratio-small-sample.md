@@ -5,8 +5,8 @@ severity: P1
 status: open
 area: metrics
 files:
-  - B4_as_requested/src/metrics_variance_ratio.py
-  - B4_as_requested/docs/B4_bao_cao.md
+  - B4_analysis/src/metrics_variance_ratio.py
+  - B4_analysis/docs/B4_bao_cao.md
 ---
 
 # 04 — Variance ratio thiếu mẫu, thiếu CI

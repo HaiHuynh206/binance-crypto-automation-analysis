@@ -60,7 +60,7 @@ Không thiếu cột nào → không có `KeyError` tiềm ẩn ở 2 nhánh ch�
 
 ## 4. Encoding
 
-Toàn bộ `.py`, `.md`, `.ipynb`, `.csv`, `.env.example` trong `B4_as_requested/` là UTF-8 hợp lệ,
+Toàn bộ `.py`, `.md`, `.ipynb`, `.csv`, `.env.example` trong `B4_analysis/` là UTF-8 hợp lệ,
 không có replacement char (U+FFFD). Chữ méo khi xem bằng PowerShell chỉ là codepage console.
 
 ## 5. Số liệu báo cáo ↔ CSV

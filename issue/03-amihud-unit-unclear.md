@@ -5,8 +5,8 @@ severity: P1
 status: open
 area: metrics / báo cáo
 files:
-  - B4_as_requested/src/metrics_roll_amihud.py
-  - B4_as_requested/docs/B4_bao_cao.md
+  - B4_analysis/src/metrics_roll_amihud.py
+  - B4_analysis/docs/B4_bao_cao.md
 ---
 
 # 03 — Đơn vị Amihud không được nêu

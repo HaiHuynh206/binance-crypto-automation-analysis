@@ -5,8 +5,8 @@ severity: P2
 status: open
 area: pipeline
 files:
-  - B4_as_requested/src/compute_from_r2.py
-  - B4_as_requested/docs/B4_bao_cao.md
+  - B4_analysis/src/compute_from_r2.py
+  - B4_analysis/docs/B4_bao_cao.md
 ---
 
 # 06 — Thiếu kiểm tra chất lượng dữ liệu

@@ -5,7 +5,7 @@ severity: P1 | P2 | P3
 status: open | fixing | fixed | wontfix
 area: metrics | pipeline | config | docs | security | testing
 files:
-  - B4_as_requested/src/<file>.py          # đường dẫn tính từ repo root
+  - B4_analysis/src/<file>.py          # đường dẫn tính từ repo root
 evidence:
   - issue/evidence/<file>.md              # bỏ nếu không có
 repro: issue/repro/<script>.py            # hoặc null
