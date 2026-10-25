@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings
+from .medallion import Layout, iter_layer_files, layer_summary, silver_datasets_for
 from .schemas import SCHEMAS
 from .state import CompletionStore
 from .timeutil import utc_now
@@ -124,14 +125,20 @@ def iter_lake_files(
                 yield dataset, path
 
 
-def build_manifest(settings: Settings) -> dict:
+def build_manifest(
+    settings: Settings,
+    *,
+    include_layers: bool = True,
+    datasets: tuple[str, ...] | None = None,
+) -> dict:
     markers = CompletionStore(settings).summary()
     rows: dict[str, int] = defaultdict(int)
     for marker in markers:
         rows[marker["dataset"]] += int(marker.get("rows") or 0)
 
-    datasets: dict[str, dict] = {}
-    for dataset in settings.datasets:
+    selected = datasets or settings.datasets
+    datasets_summary: dict[str, dict] = {}
+    for dataset in selected:
         files = 0
         size = 0
         seen_hours: set[str] = set()
@@ -148,7 +155,7 @@ def build_manifest(settings: Settings) -> dict:
                 seen_hours.add(bucket)
                 first_hour = min(first_hour or bucket, bucket)
                 last_hour = max(last_hour or bucket, bucket)
-        datasets[dataset] = {
+        datasets_summary[dataset] = {
             "partitions": len(seen_hours),
             "rows": rows.get(dataset, 0),
             "files": files,
@@ -161,7 +168,7 @@ def build_manifest(settings: Settings) -> dict:
             ],
         }
 
-    return {
+    manifest = {
         "generated_at": utc_now().astimezone(timezone.utc).isoformat(),
         "exchange": settings.exchange,
         "symbols": list(settings.symbols),
@@ -169,8 +176,17 @@ def build_manifest(settings: Settings) -> dict:
             "lake/exchange=<exchange>/dataset=<dataset>/symbol=<symbol>/"
             "date=<YYYY-MM-DD>/hour=<HH>/part-00000.parquet"
         ),
-        "datasets": datasets,
+        "datasets": datasets_summary,
     }
+    if include_layers:
+        manifest["layers_layout"] = {
+            "silver": "silver/dataset=<name>/symbol=<symbol>/date=<YYYY-MM-DD>/part-00000.parquet",
+            "gold": "gold/mart=<name>/symbol=<symbol>/date=<YYYY-MM-DD>/part-00000.parquet",
+        }
+        manifest["layers"] = layer_summary(
+            Layout.from_settings(settings), silver_datasets_for(selected)
+        )
+    return manifest
 
 
 def sync_to_s3(
@@ -181,6 +197,7 @@ def sync_to_s3(
     dry_run: bool = False,
     force: bool = False,
     upload_manifest: bool = True,
+    include_layers: bool = True,
 ) -> SyncResult:
     if not settings.s3_configured:
         raise ValueError("CRYPTO_S3_BUCKET is not set")
@@ -190,7 +207,28 @@ def sync_to_s3(
     client = _client(settings)
     result = SyncResult(dry_run=dry_run)
 
-    for _, path in iter_lake_files(settings, datasets, symbols):
+    # A filtered run only sees part of the lake, so its manifest would replace the
+    # full one with a subset. Only an unfiltered run may publish the manifest.
+    filtered = set(datasets) != set(settings.datasets) or set(symbols) != set(
+        settings.symbols
+    )
+    if filtered and upload_manifest and not dry_run:
+        log.info("Dataset/symbol filter given; leaving _manifest.json untouched")
+        upload_manifest = False
+
+    publish_layers = include_layers and settings.medallion_enabled
+    if include_layers and not settings.medallion_enabled:
+        log.warning("CRYPTO_MEDALLION_ENABLED is off; publishing Bronze only")
+
+    paths = [path for _, path in iter_lake_files(settings, datasets, symbols)]
+    if publish_layers:  # Silver and Gold share the bucket, same prefix, same Hive layout
+        layout = Layout.from_settings(settings)
+        layer_datasets = silver_datasets_for(datasets)
+        paths.extend(
+            path for _, path in iter_layer_files(layout, symbols, layer_datasets)
+        )
+
+    for path in paths:
         key = object_key(settings, path)
         if not force and _already_synced(client, settings.s3_bucket, key, path):
             result.skipped += 1
@@ -210,7 +248,13 @@ def sync_to_s3(
         result.files.append(f"s3://{settings.s3_bucket}/{key}")
 
     if upload_manifest and not dry_run:
-        body = json.dumps(build_manifest(settings), indent=2, sort_keys=True).encode("utf-8")
+        body = json.dumps(
+            build_manifest(
+                settings, include_layers=publish_layers, datasets=datasets
+            ),
+            indent=2,
+            sort_keys=True,
+        ).encode("utf-8")
         extra = {"ContentType": "application/json"}
         if settings.s3_acl:
             extra["ACL"] = settings.s3_acl

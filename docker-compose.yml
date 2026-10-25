@@ -17,6 +17,8 @@ x-airflow-common: &airflow-common
     CRYPTO_DATASETS: ${CRYPTO_DATASETS:-klines_1s,klines_1m,agg_trades,funding_rate,open_interest}
     CRYPTO_WEIGHT_PER_MINUTE: ${CRYPTO_WEIGHT_PER_MINUTE:-2400}
     CRYPTO_LOOKBACK_HOURS: ${CRYPTO_LOOKBACK_HOURS:-24}
+    CRYPTO_DQ_FAIL_ON: ${CRYPTO_DQ_FAIL_ON:-missing}
+    CRYPTO_MEDALLION_ENABLED: ${CRYPTO_MEDALLION_ENABLED:-1}
     # S3-compatible publishing (R2/S3/MinIO). Empty bucket disables the task.
     CRYPTO_S3_BUCKET: ${CRYPTO_S3_BUCKET:-}
     CRYPTO_S3_PREFIX: ${CRYPTO_S3_PREFIX:-crypto}

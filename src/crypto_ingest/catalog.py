@@ -86,5 +86,10 @@ def build_catalog(settings: Settings) -> dict[str, str]:
         connection.execute("CHECKPOINT")
     finally:
         connection.close()
+
+    # bronze_* aliases plus silver_* / gold_* views for the layers built on top.
+    from .medallion import Layout, build_catalog_layers
+
+    views.update(build_catalog_layers(Layout.from_settings(settings), settings.catalog_path))
     log.info("Catalog rebuilt at %s (%s views)", settings.catalog_path, len(views))
     return views

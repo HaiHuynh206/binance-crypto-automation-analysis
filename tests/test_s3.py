@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -139,3 +140,102 @@ def test_sync_requires_a_bucket(tmp_path):
     settings = make_settings(tmp_path, s3_bucket=None)
     with pytest.raises(ValueError, match="CRYPTO_S3_BUCKET"):
         s3.sync_to_s3(settings)
+
+
+def test_sync_can_publish_bronze_only(tmp_path, monkeypatch):
+    settings = make_settings(tmp_path)
+    make_partition(settings)
+    layer = (
+        settings.data_root
+        / "silver"
+        / "dataset=bars_1m"
+        / "symbol=BTCUSDT"
+        / "date=2026-10-21"
+        / "part-00000.parquet"
+    )
+    layer.parent.mkdir(parents=True)
+    layer.write_bytes(b"silver-layer")
+
+    client = FakeS3()
+    monkeypatch.setattr(s3, "_client", lambda _settings: client)
+    bronze = s3.sync_to_s3(settings, include_layers=False)
+    assert bronze.uploaded == 1
+    assert all("/silver/" not in key for key in client.uploads)
+    manifest = json.loads(client.objects["crypto/_manifest.json"])
+    assert "layers" not in manifest
+
+    layers_client = FakeS3()
+    monkeypatch.setattr(s3, "_client", lambda _settings: layers_client)
+    s3.sync_to_s3(settings, include_layers=True)
+    assert any("/silver/" in key for key in layers_client.uploads)
+    manifest = json.loads(layers_client.objects["crypto/_manifest.json"])
+    assert "silver" in manifest["layers"]
+
+
+def write_layer(root: Path, marker: str, name: str) -> Path:
+    path = (
+        root
+        / f"{marker}={name}"
+        / "symbol=BTCUSDT"
+        / "date=2026-10-21"
+        / "part-00000.parquet"
+    )
+    path.parent.mkdir(parents=True)
+    path.write_bytes(name.encode())
+    return path
+
+
+def test_sync_respects_medallion_rollout_flag(tmp_path, monkeypatch):
+    settings = make_settings(tmp_path, medallion_enabled=False)
+    make_partition(settings)
+    write_layer(settings.data_root / "silver", "dataset", "bars_1m")
+
+    client = FakeS3()
+    monkeypatch.setattr(s3, "_client", lambda _settings: client)
+    result = s3.sync_to_s3(settings, include_layers=True)
+
+    assert result.uploaded == 1
+    assert all("/silver/" not in key for key in client.uploads)
+    manifest = json.loads(client.objects["crypto/_manifest.json"])
+    assert "layers" not in manifest
+
+
+def test_sync_filters_silver_layers_by_dataset(tmp_path, monkeypatch):
+    settings = make_settings(tmp_path)
+    make_partition(settings)
+    write_layer(settings.data_root / "silver", "dataset", "bars_1m")
+    write_layer(settings.data_root / "silver", "dataset", "trades")
+
+    client = FakeS3()
+    monkeypatch.setattr(s3, "_client", lambda _settings: client)
+    s3.sync_to_s3(settings, datasets=("klines_1m",), include_layers=True)
+
+    silver_keys = [key for key in client.uploads if "/silver/" in key]
+    assert silver_keys
+    assert all("dataset=bars_1m/" in key for key in silver_keys)
+
+
+def test_filtered_sync_leaves_existing_manifest_untouched(tmp_path, monkeypatch):
+    settings = make_settings(tmp_path)
+    make_partition(settings)
+
+    client = FakeS3()
+    client.objects["crypto/_manifest.json"] = b'{"full": true}'
+    monkeypatch.setattr(s3, "_client", lambda _settings: client)
+    result = s3.sync_to_s3(settings, datasets=("klines_1m",), symbols=("ETHUSDT",))
+
+    assert result.manifest_uploaded is False
+    assert client.objects["crypto/_manifest.json"] == b'{"full": true}'
+
+
+def test_unfiltered_sync_publishes_manifest_for_all_datasets(tmp_path, monkeypatch):
+    settings = make_settings(tmp_path)
+    make_partition(settings)
+
+    client = FakeS3()
+    monkeypatch.setattr(s3, "_client", lambda _settings: client)
+    result = s3.sync_to_s3(settings, settings.datasets, settings.symbols)
+
+    assert result.manifest_uploaded is True
+    manifest = json.loads(client.objects["crypto/_manifest.json"])
+    assert set(manifest["datasets"]) == set(settings.datasets)

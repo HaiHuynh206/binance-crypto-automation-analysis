@@ -3,7 +3,7 @@ PYTHON ?= python3
 VENV := .venv
 BIN := $(VENV)/bin
 
-.PHONY: help venv install test lint ingest backfill status catalog sync-s3 up down logs clean permissions share unshare migrate
+.PHONY: help venv install test lint ingest backfill status catalog silver dq gold layers sync-s3 up down logs clean permissions share unshare migrate
 
 help:
 	@echo "make install    - create .venv and install the package (editable)"
@@ -11,6 +11,10 @@ help:
 	@echo "make backfill   - backfill DAYS=7"
 	@echo "make status     - show lake size and coverage"
 	@echo "make catalog    - rebuild DuckDB views"
+	@echo "make silver      - build Silver from Bronze (HOURS=36, FORCE=1)"
+	@echo "make dq         - hourly data quality gate (HOURS=36)"
+	@echo "make gold       - build Gold marts from Silver (HOURS=36)"
+	@echo "make layers     - silver -> dq -> gold in one go (FORCE=1)"
 	@echo "make sync-s3    - upload the lake to S3/R2/MinIO (DRY_RUN=1 to preview)"
 	@echo "make test       - run unit tests"
 	@echo "make up/down    - start/stop the Airflow stack (Docker)"
@@ -42,6 +46,22 @@ status: install
 
 catalog: install
 	@set -a; [ -f .env ] && . ./.env; set +a; $(BIN)/crypto-ingest catalog
+
+define RUN_LAYER
+	@set -a; [ -f .env ] && . ./.env; set +a; $(BIN)/crypto-ingest $(1) $(2) --hours $(or $(HOURS),36)
+endef
+
+silver: install
+	$(call RUN_LAYER,silver,$(if $(FORCE),--force,))
+
+dq: install
+	$(call RUN_LAYER,dq,)
+
+gold: install
+	$(call RUN_LAYER,gold,)
+
+layers: install
+	$(call RUN_LAYER,layers,$(if $(FORCE),--force,))
 
 sync-s3: install
 	@set -a; [ -f .env ] && . ./.env; set +a; $(BIN)/crypto-ingest sync-s3 $(if $(DRY_RUN),--dry-run,) $(if $(FORCE),--force,)

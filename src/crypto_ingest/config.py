@@ -27,6 +27,13 @@ def _csv_env(name: str, default: str, *, upper: bool = True) -> tuple[str, ...]:
     return tuple(item.upper() for item in items) if upper else tuple(items)
 
 
+def _bool_env(name: str, default: bool = True) -> bool:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
 @dataclass(frozen=True)
 class Settings:
     data_root: Path
@@ -39,6 +46,7 @@ class Settings:
     max_pages: int
     weight_per_minute: int
     lookback_hours: int
+    medallion_enabled: bool = True
     s3_bucket: str | None = None
     s3_prefix: str = "crypto"
     s3_endpoint_url: str | None = None
@@ -74,6 +82,7 @@ class Settings:
             # per IP; keep headroom for other tasks sharing the IP.
             weight_per_minute=int(os.getenv("CRYPTO_WEIGHT_PER_MINUTE", "2400")),
             lookback_hours=int(os.getenv("CRYPTO_LOOKBACK_HOURS", "24")),
+            medallion_enabled=_bool_env("CRYPTO_MEDALLION_ENABLED", True),
             s3_bucket=os.getenv("CRYPTO_S3_BUCKET") or None,
             s3_prefix=os.getenv("CRYPTO_S3_PREFIX", "crypto").strip("/") or "crypto",
             s3_endpoint_url=os.getenv("CRYPTO_S3_ENDPOINT_URL") or None,

@@ -5,12 +5,22 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from collections import defaultdict
 from datetime import timedelta
 
 from .catalog import build_catalog
 from .config import SUPPORTED_DATASETS, Settings
+from .medallion import (
+    DataQualityError,
+    Layout,
+    MedallionError,
+    build_gold,
+    build_silver,
+    run_dq,
+    silver_datasets_for,
+)
 from .pipeline import IngestError, ingest_window
 from .s3 import sync_to_s3
 from .state import CompletionStore
@@ -168,8 +178,125 @@ def _cmd_sync_s3(args) -> int:
         dry_run=args.dry_run,
         force=args.force,
         upload_manifest=not args.no_manifest,
+        include_layers=not args.bronze_only,
     )
     print(json.dumps(result.as_dict(), indent=2))
+    return 0
+
+
+def _layer_window(args):
+    end = parse_datetime(args.end) if args.end else utc_now()
+    start = parse_datetime(args.start) if args.start else end - timedelta(hours=args.hours)
+    if end <= start:
+        raise SystemExit("--end must be after --start")
+    return start, end
+
+
+def _csv(values: list[str] | None) -> tuple[str, ...] | None:
+    if not values:
+        return None
+    items: list[str] = []
+    for value in values:
+        items.extend(part.strip() for part in value.split(",") if part.strip())
+    return tuple(dict.fromkeys(items)) or None
+
+
+def _fail_on(args) -> tuple[str, ...]:
+    raw = args.fail_on if args.fail_on is not None else os.getenv("CRYPTO_DQ_FAIL_ON", "missing")
+    return tuple(part.strip() for part in raw.split(",") if part.strip())
+
+
+def _print_results(results) -> None:
+    print(json.dumps([result.as_dict() for result in results], indent=2))
+
+
+def _cmd_silver(args) -> int:
+    settings = Settings.from_env()
+    start, end = _layer_window(args)
+    try:
+        results = build_silver(
+            Layout.from_settings(settings),
+            start,
+            end,
+            datasets=_csv(args.dataset) or silver_datasets_for(settings.datasets),
+            symbols=_symbols(args.symbols, settings),
+            force=args.force,
+        )
+    except MedallionError as exc:
+        _print_results(exc.results)
+        print(exc, file=sys.stderr)
+        return 1
+    _print_results(results)
+    return 0
+
+
+def _cmd_dq(args) -> int:
+    settings = Settings.from_env()
+    start, end = _layer_window(args)
+    try:
+        report = run_dq(
+            Layout.from_settings(settings),
+            start,
+            end,
+            fail_on=_fail_on(args),
+            symbols=_symbols(args.symbols, settings),
+            datasets=_csv(args.dataset),
+        )
+    except DataQualityError as exc:
+        print(json.dumps(exc.report.as_dict(), indent=2))
+        print(exc, file=sys.stderr)
+        return 1
+    print(json.dumps(report.as_dict(), indent=2))
+    return 0
+
+
+def _cmd_gold(args) -> int:
+    settings = Settings.from_env()
+    start, end = _layer_window(args)
+    try:
+        results = build_gold(
+            Layout.from_settings(settings),
+            start,
+            end,
+            marts=_csv(args.mart),
+            symbols=_symbols(args.symbols, settings),
+        )
+    except MedallionError as exc:
+        _print_results(exc.results)
+        print(exc, file=sys.stderr)
+        return 1
+    _print_results(results)
+    return 0
+
+
+def _cmd_layers(args) -> int:
+    """Silver, then the data quality gate, then Gold. Gold is skipped if the gate fails."""
+    settings = Settings.from_env()
+    layout = Layout.from_settings(settings)
+    start, end = _layer_window(args)
+    symbols = _symbols(args.symbols, settings)
+    try:
+        _print_results(
+            build_silver(
+                layout,
+                start,
+                end,
+                datasets=silver_datasets_for(settings.datasets),
+                symbols=symbols,
+                force=args.force,
+            )
+        )
+        report = run_dq(layout, start, end, fail_on=_fail_on(args), symbols=symbols)
+        print(json.dumps(report.as_dict(), indent=2))
+        _print_results(build_gold(layout, start, end, symbols=symbols))
+    except MedallionError as exc:
+        _print_results(exc.results)
+        print(exc, file=sys.stderr)
+        return 1
+    except DataQualityError as exc:
+        print(json.dumps(exc.report.as_dict(), indent=2))
+        print(f"{exc}\nGold was not built.", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -209,7 +336,55 @@ def build_parser() -> argparse.ArgumentParser:
     s3.add_argument("--dry-run", action="store_true", help="Only show what would be uploaded")
     s3.add_argument("--force", action="store_true", help="Upload even if unchanged")
     s3.add_argument("--no-manifest", action="store_true", help="Skip _manifest.json")
+    s3.add_argument(
+        "--bronze-only", action="store_true", help="Do not upload the Silver and Gold layers"
+    )
     s3.set_defaults(func=_cmd_sync_s3)
+
+    def add_window(sub: argparse.ArgumentParser) -> None:
+        sub.add_argument("-s", "--symbols")
+        sub.add_argument("--start", help="ISO-8601 UTC timestamp")
+        sub.add_argument("--end", help="ISO-8601 UTC timestamp (default: now)")
+        sub.add_argument(
+            "--hours",
+            type=int,
+            default=36,
+            help="Window size when --start is not given (default 36). Whole UTC days are rebuilt.",
+        )
+
+    fail_help = (
+        "Statuses that stop the run: missing, partial, id_gaps "
+        "(comma separated, default: $CRYPTO_DQ_FAIL_ON or 'missing')"
+    )
+
+    silver = subparsers.add_parser("silver", help="Build the Silver layer from Bronze")
+    silver.add_argument("-d", "--dataset", action="append", help="bars_1s, bars_1m, trades, ...")
+    silver.add_argument(
+        "--force", action="store_true", help="Rebuild days even if Silver is already up to date"
+    )
+    add_window(silver)
+    silver.set_defaults(func=_cmd_silver)
+
+    dq = subparsers.add_parser("dq", help="Write hourly data quality and stop on failures")
+    dq.add_argument(
+        "-d", "--dataset", action="append", help="Limit to bars_1s, bars_1m, trades, ..."
+    )
+    dq.add_argument("--fail-on", help=fail_help)
+    add_window(dq)
+    dq.set_defaults(func=_cmd_dq)
+
+    gold = subparsers.add_parser("gold", help="Build the Gold marts from Silver")
+    gold.add_argument("-m", "--mart", action="append", help="ohlcv, market_hourly, ...")
+    add_window(gold)
+    gold.set_defaults(func=_cmd_gold)
+
+    layers = subparsers.add_parser("layers", help="Silver, then DQ gate, then Gold")
+    layers.add_argument("--fail-on", help=fail_help)
+    layers.add_argument(
+        "--force", action="store_true", help="Rebuild Silver even if it is already up to date"
+    )
+    add_window(layers)
+    layers.set_defaults(func=_cmd_layers)
     return parser
 
 
@@ -220,6 +395,10 @@ def main(argv: list[str] | None = None) -> int:
         return args.func(args)
     except KeyboardInterrupt:
         return 130
+    except ValueError as exc:
+        # Bad dataset/mart/status names and missing config: report without a traceback.
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
