@@ -1,0 +1,8 @@
+dataset,source,licence,period,symbols,rows,cols,size_mb,real_or_simulated,pct_hours_not_ok,used_in_notebook,pct_cells_null
+silver/trades,Binance public data (data.binance.vision / REST) -> crypto_ingest lake (Silver),CC BY-NC-SA 4.0,2026-07-01 -> 2026-10-24,BTCUSDT+ETHUSDT,171770585.0,11.0,2188.3,real,0.18,via export,
+silver/bars_1s,Binance public data (data.binance.vision / REST) -> crypto_ingest lake (Silver),CC BY-NC-SA 4.0,2026-07-01 -> 2026-10-24,BTCUSDT+ETHUSDT,19951200.0,16.0,664.8,real,0.216,via export,
+silver/bars_1m,Binance public data (data.binance.vision / REST) -> crypto_ingest lake (Silver),CC BY-NC-SA 4.0,2026-07-01 -> 2026-10-24,BTCUSDT+ETHUSDT,332520.0,16.0,20.0,real,0.216,via export,
+data_export/flow_10s.parquet,src/build_minute_panel.py from Silver,CC BY-NC-SA 4.0,2026-07-01 -> 2026-10-24,BTCUSDT+ETHUSDT,1994904.0,5.0,40.2,real (derived),,yes,0.0
+data_export/hourly_roll.parquet,src/build_minute_panel.py from Silver,CC BY-NC-SA 4.0,2026-07-01 -> 2026-10-24,BTCUSDT+ETHUSDT,5544.0,4.0,0.1,real (derived),,yes,0.0
+data_export/minute_panel.parquet,src/build_minute_panel.py from Silver,CC BY-NC-SA 4.0,2026-07-01 -> 2026-10-24,BTCUSDT+ETHUSDT,332640.0,11.0,14.8,real (derived),,yes,0.013
+LOBSTER sample (bộ dự phòng theo đề),lobsterdata.com,,thử tải 2026-10-25: KHÔNG truy cập được,,,,,không có dữ liệu,,"KHÔNG dùng làm bằng chứng. Link tệp mẫu hỏng (trả về trang HTML 457 B thay vì zip), nay phải xin bằng email học thuật. Kết quả AAPL 21/06/2012 (118.497 snapshot) chạy trước đó lấy từ tệp không còn, không kiểm chứng được nên không dùng. Nhóm KHÔNG có bộ dự phòng.",
