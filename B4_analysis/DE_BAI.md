@@ -72,3 +72,33 @@ liệu sổ lệnh công khai: sản phẩm là bộ thước đo và danh sách
 - ngoại suy từ tài sản số và thị trường Mỹ sang Việt Nam;
 - rủi ro vận hành của hệ thống tự động (sự cố ở buổi 4);
 - chất lượng thị trường đo bằng chỉ tiêu nào.
+
+---
+
+## 3. Rubric chấm điểm
+
+| Tiêu chí | Điểm | Phải có khi đề xuất | Phải có khi trình bày |
+|---|---|---|---|
+| Nội dung và lập luận | 40 | Gọi tên một quyết định tài chính của một loại tổ chức và một câu hỏi trung tâm trả lời được bằng dữ liệu; nêu trước đường cơ sở sẽ đem ra so; phạm vi vừa với thời lượng một lượt trình bày. | Đủ sáu bước: vấn đề, dữ liệu, phương pháp, kiến trúc, rủi ro và tuân thủ, khuyến nghị. Có ít nhất một phản biện với chính kết luận của nhóm. Khuyến nghị rõ: làm, làm có điều kiện hay dừng. |
+| Nghiên cứu và bằng chứng | 20 | Bảng kê dữ liệu đã tải thử: tên bộ, nơi tải, giấy phép, kỳ dữ liệu, số dòng, số cột, dung lượng đo được, thật hay mô phỏng; kèm một bộ dự phòng. Ba nghiên cứu công bố từ năm 2021 làm điểm tựa. | Mô tả dữ liệu bằng số đo; một kết quả tự chạy có so với đường cơ sở và kiểm ngoài mẫu; mọi con số có nguồn và năm. Dữ liệu mô phỏng hoặc tổng hợp phải ghi nhãn và không dùng làm bằng chứng về thị trường. |
+| Hỏi đáp và phản biện | 15 | Nêu hai phản biện mạnh nhất mà nhóm dự kiến sẽ gặp. Câu hỏi không trùng với chủ đề của nhóm khác. | Gửi slide, trang tóm tắt và sổ tay phân tích cho nhóm phản biện đúng hạn. Mọi thành viên trả lời được câu hỏi về dữ liệu và phương pháp. Có hai câu hỏi viết sẵn cho nhóm được phân công phản biện. |
+| Hình thức và phong cách | 15 | Dàn bài sáu bước, nằm trong giới hạn số slide của thể thức thuyết trình. | Mỗi slide trả lời một câu hỏi. Hình tự vẽ từ dữ liệu của nhóm, có trục, đơn vị, nguồn và kỳ số liệu; không dùng trục cắt hay hai trục gây hiểu lầm. |
+| Thời gian và hợp tác nhóm | 10 | Phân công từng thành viên theo sáu bước; kế hoạch làm việc theo các mốc buổi 5, 6, 7 và hạn nộp lần 1 trước buổi 8. | Đúng thời lượng của thể thức; nộp lần 1 và bản chính thức đúng hạn; mọi thành viên cùng trình bày và cùng trả lời. |
+
+---
+
+## 4. Nơi bắt đầu tìm dữ liệu công khai
+
+Đều là các kho đã dùng trong danh mục này:
+
+- UCI Machine Learning Repository
+- OpenML
+- Kaggle (cần tài khoản)
+- Hugging Face Datasets
+- Cổng dữ liệu của cơ quan quản lý như SBA, HMDA và EDGAR của SEC
+- Wikimedia Pageviews API
+- Binance public data
+- Open Source Asset Pricing
+- Global Factor Data
+
+Bộ nào cũng phải đọc giấy phép trên trang gốc trước khi dùng.
