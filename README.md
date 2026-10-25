@@ -89,6 +89,7 @@ print(con.sql('''
     SELECT symbol, count(*) rows, min(open_time), max(open_time)
     FROM klines_1m GROUP BY 1 ORDER BY 1
 '''))
+# Silver/Gold: view gold_ohlcv, gold_market_hourly, silver_trades... (xem docs/consumer.md)
 "
 
 # Backfill 7 ngày
@@ -135,12 +136,24 @@ Lưu ý:
 - Đổi `CRYPTO_SYMBOLS`/`CRYPTO_DATASETS` trong `.env` rồi
   `docker compose up -d` để áp dụng.
 
-Luồng task:
+Luồng task (3 task group):
 
 ```
-ingest_* (5 task) ──┬─► refresh_catalog
-                    └─► publish_to_s3 (chỉ khi CRYPTO_S3_BUCKET được set)
+bronze/ingest_* (5 task)
+      └─► silver_gold/build_silver_layer ─► silver_gold/dq_check ─► silver_gold/build_gold_layer
+                                                                          ├─► serve/refresh_catalog
+                                                                          └─► serve/publish_to_s3
 ```
+
+Tên task trong Airflow có tiền tố group (`bronze.ingest_klines_1m`,
+`silver_gold.dq_check`, `serve.publish_to_s3`); task_id bên trong group giữ nguyên
+như trước khi refactor.
+
+`dq_check` là cổng chất lượng: fail thì Gold không được dựng, catalog vẫn refresh,
+và S3 chỉ đẩy Bronze (Silver/Gold bị bỏ qua). Đặt `CRYPTO_MEDALLION_ENABLED=0` để
+tạm quay lại luồng chỉ có Bronze: DAG chỉ còn group `bronze` và `serve`
+(`build_silver_layer`/`dq_check`/`build_gold_layer` không được tạo). Chi tiết
+Bronze/Silver/Gold ở [docs/medallion.md](docs/medallion.md).
 
 `max_active_tasks=2` để tránh 5 task cùng đập vào rate limit của Binance.
 
@@ -175,13 +188,14 @@ make sync-s3 DRY_RUN=1   # xem trước
 make sync-s3             # upload phần thay đổi + _manifest.json
 ```
 
-DAG tự chạy task `publish_to_s3` sau mỗi lần ingest khi `CRYPTO_S3_BUCKET` được set.
+DAG tự chạy task `serve.publish_to_s3` sau mỗi lần ingest khi `CRYPTO_S3_BUCKET` được set.
 
 - Người nhận chỉ cần **read-only token**, không cấp write token.
 - Manifest nằm tại `s3://<bucket>/<prefix>/_manifest.json`.
 - Hướng dẫn tạo bucket R2, cấp quyền đọc, query mẫu và chi phí:
   [`docs/share-s3.md`](docs/share-s3.md).
-- Hướng dẫn gửi cho người nhận: [`docs/consumer.md`](docs/consumer.md).
+- Hướng dẫn gửi cho người nhận (chọn tầng Bronze/Silver/Gold, công thức query, lưu ý múi giờ
+  và partition): [`docs/consumer.md`](docs/consumer.md).
 
 ## Chia sẻ UI
 
@@ -250,6 +264,8 @@ Tất cả qua biến môi trường (xem `.env.example`):
 | `CRYPTO_LOOKBACK_HOURS` | `24` | Quét lại 24h gần nhất, tự bù hour thiếu sau downtime |
 | `CRYPTO_MAX_PAGES` | `5000` | Chặn an toàn khi phân trang |
 | `CRYPTO_HTTP_TIMEOUT` | `20` | Timeout mỗi request (giây) |
+| `CRYPTO_DQ_FAIL_ON` | `missing` | Trạng thái DQ làm dừng pipeline: `missing`, `partial`, `id_gaps` |
+| `CRYPTO_MEDALLION_ENABLED` | `1` | `0` = DAG/S3 chỉ chạy Bronze, bỏ qua Silver/DQ/Gold |
 | `CRYPTO_S3_BUCKET` | (trống) | Bucket đích; trống = tắt publish S3 |
 | `CRYPTO_S3_PREFIX` | `crypto` | Prefix trên bucket |
 | `CRYPTO_S3_ENDPOINT_URL` | (trống) | R2/MinIO endpoint; trống = AWS S3 |
@@ -275,8 +291,9 @@ src/crypto_ingest/
   state.py                    marker hoàn thành
   s3.py                       upload lake lên S3/R2/MinIO + manifest
   pipeline.py                 orchestration một window
-  catalog.py                  tạo DuckDB views
-  cli.py                      ingest / backfill / status / catalog / sync-s3
+  medallion.py                Silver / DQ / Gold (DuckDB SQL)
+  catalog.py                  tạo DuckDB views (bronze_*, silver_*, gold_*)
+  cli.py                      ingest / backfill / status / catalog / silver / dq / gold / layers / sync-s3
 scripts/
   install-docker.sh           cài Docker trên Ubuntu/Debian
   migrate-to-vps.sh           rsync code + data lên VPS
@@ -285,9 +302,10 @@ scripts/
 tests/                        unit test (không gọi mạng)
 docs/
   assets/architecture.png      sơ đồ kiến trúc (dùng ở đầu README)
+  medallion.md                kiến trúc Bronze / Silver / Gold
   storage.md                  khuyến nghị nơi lưu dữ liệu
   share-s3.md                 chia sẻ data qua S3/R2/MinIO
-  consumer.md                 hướng dẫn cho người nhận data
+  consumer.md                 hướng dẫn query/dùng Bronze, Silver, Gold
   sharing.md                  chia sẻ Airflow UI
   deploy-vps.md               deploy 24/7 lên VPS
 ```

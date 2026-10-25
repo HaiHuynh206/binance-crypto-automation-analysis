@@ -65,7 +65,7 @@ Hoặc gọi thẳng CLI (nhớ nạp `.env`; `make` tự nạp giúp bạn):
 ```bash
 set -a; . ./.env; set +a
 .venv/bin/crypto-ingest sync-s3 --dry-run
-.venv/bin/crypto-ingest sync-s3 -d klines_1m,agg_trades -s BTCUSDT
+.venv/bin/crypto-ingest sync-s3 -d klines_1m,agg_trades -s BTCUSDT   # có lọc: không đụng _manifest.json
 .venv/bin/crypto-ingest sync-s3 --force          # upload lại tất cả
 .venv/bin/crypto-ingest sync-s3 --no-manifest    # bỏ _manifest.json
 ```
@@ -77,7 +77,7 @@ docker compose up -d --build
 ```
 
 Kiểm tra task trong Airflow: DAG `crypto_market_ingest` có thêm
-`publish_to_s3`, chạy song song với `refresh_catalog` sau khi ingest xong. Task chỉ
+`serve.publish_to_s3`, chạy song song với `serve.refresh_catalog` sau khi ingest xong. Task chỉ
 upload file mới/thay đổi (so sánh MD5/ETag, fallback mtime), nên chạy lại an toàn.
 
 ## 4. Cấu trúc trên bucket
@@ -151,10 +151,15 @@ print(url)
 
 Presigned URL chỉ hợp với từng object, không dùng cho wildcard/glob.
 
-> Gửi kèm [`docs/consumer.md`](consumer.md) cho người nhận: hướng dẫn query/tải,
-> không cần biết Airflow.
+> Gửi kèm [`docs/consumer.md`](consumer.md) cho người nhận: chọn tầng Bronze/Silver/Gold,
+> công thức query và lưu ý, không cần biết Airflow.
 
 ## 6. Query dữ liệu
+
+Bucket có ba tầng cùng prefix: `lake/` (Bronze), `silver/`, `gold/`. Phân tích nên bắt đầu
+từ Gold (`gold/mart=ohlcv`, `market_hourly`, `derivatives_hourly`, `data_quality_daily`);
+công thức đầy đủ nằm trong [`consumer.md`](consumer.md). Ví dụ dưới đây dùng Bronze để
+minh hoạ kết nối.
 
 ### DuckDB (khuyến nghị)
 
@@ -178,6 +183,15 @@ ORDER BY 1, 2, 3;
 ```
 
 Nếu gặp lỗi đường dẫn với R2, thêm `SET s3_url_style = 'path';`.
+
+Đọc Gold (nên lọc `symbol` và `date` trước để DuckDB chỉ đọc đúng file):
+
+```sql
+SELECT bucket, close, volume
+FROM read_parquet('s3://crypto-lake/crypto/gold/mart=ohlcv/**/*.parquet', hive_partitioning = true)
+WHERE symbol = 'BTCUSDT' AND "interval" = '1h' AND is_complete AND date >= '2026-10-01'
+ORDER BY bucket;
+```
 
 Python:
 
