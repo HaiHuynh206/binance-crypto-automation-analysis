@@ -7,3 +7,6 @@ __pycache__/
 *.zip
 venv/
 .venv/
+
+# Notebook gắn key R2 để gửi riêng, không commit
+notebooks/*_R2.ipynb
